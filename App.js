@@ -1,9 +1,8 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
 import jsQR from 'jsqr';
-import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import jpeg from 'jpeg-js';
 import { PNG } from 'pngjs/browser';
@@ -12,6 +11,7 @@ export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [view, setView] = useState('menu'); // 'menu', 'camera'
+  const [loading, setLoading] = useState(false);
 
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(true);
@@ -35,63 +35,70 @@ export default function App() {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
+      setLoading(true);
       const asset = result.assets[0];
       const base64 = asset.base64;
 
       if (!base64) {
         Alert.alert("Error", "Could not get image data.");
+        setLoading(false);
         return;
       }
 
-      try {
-        const buffer = Buffer.from(base64, 'base64');
-        let width, height, data;
+      // Use setTimeout to allow the UI to update (show loading spinner) before heavy processing
+      setTimeout(async () => {
+        try {
+          const buffer = Buffer.from(base64, 'base64');
+          let width, height, data;
 
-        // Simple heuristic to detect PNG vs JPEG based on file extension or magic bytes could be added
-        // For now, let's try to decode as JPEG first, then PNG if that fails, or check uri
-        const isPng = asset.uri.toLowerCase().endsWith('.png');
+          // Simple heuristic to detect PNG vs JPEG based on file extension or magic bytes could be added
+          // For now, let's try to decode as JPEG first, then PNG if that fails, or check uri
+          const isPng = asset.uri.toLowerCase().endsWith('.png');
 
-        if (isPng) {
-          try {
-            const png = new PNG();
-            await new Promise((resolve, reject) => {
-              png.parse(buffer, (err, img_data) => {
-                if (err) reject(err);
-                else {
-                  width = img_data.width;
-                  height = img_data.height;
-                  data = new Uint8ClampedArray(img_data.data);
-                  resolve();
-                }
+          if (isPng) {
+            try {
+              const png = new PNG();
+              await new Promise((resolve, reject) => {
+                png.parse(buffer, (err, img_data) => {
+                  if (err) reject(err);
+                  else {
+                    width = img_data.width;
+                    height = img_data.height;
+                    data = new Uint8ClampedArray(img_data.data);
+                    resolve();
+                  }
+                });
               });
-            });
-          } catch (e) {
-            console.log("PNG decode failed, trying JPEG", e);
-            // Fallback or error
-          }
-        } else {
-          // Default to JPEG
-          const rawImageData = jpeg.decode(buffer, { useTArray: true });
-          width = rawImageData.width;
-          height = rawImageData.height;
-          data = new Uint8ClampedArray(rawImageData.data);
-        }
-
-        if (data) {
-          const code = jsQR(data, width, height);
-          if (code) {
-            Alert.alert("Scanned from Image!", `Data: ${code.data}`);
+            } catch (e) {
+              console.log("PNG decode failed, trying JPEG", e);
+              // Fallback or error
+            }
           } else {
-            Alert.alert("No QR Code Found", "Could not detect a QR code in this image.");
+            // Default to JPEG
+            const rawImageData = jpeg.decode(buffer, { useTArray: true });
+            width = rawImageData.width;
+            height = rawImageData.height;
+            data = new Uint8ClampedArray(rawImageData.data);
           }
-        } else {
-          Alert.alert("Error", "Could not decode image data.");
-        }
 
-      } catch (error) {
-        console.error(error);
-        Alert.alert("Error", "Failed to scan image. " + error.message);
-      }
+          if (data) {
+            const code = jsQR(data, width, height);
+            if (code) {
+              Alert.alert("Scanned from Image!", `Data: ${code.data}`);
+            } else {
+              Alert.alert("No QR Code Found", "Could not detect a QR code in this image.");
+            }
+          } else {
+            Alert.alert("Error", "Could not decode image data.");
+          }
+
+        } catch (error) {
+          console.error(error);
+          Alert.alert("Error", "Failed to scan image. " + error.message);
+        } finally {
+          setLoading(false);
+        }
+      }, 100);
     }
   };
 
@@ -105,6 +112,12 @@ export default function App() {
         <TouchableOpacity style={styles.menuButton} onPress={scanFromImage}>
           <Text style={styles.menuButtonText}>Scan from Gallery</Text>
         </TouchableOpacity>
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color="#2196F3" />
+            <Text style={styles.loadingText}>Processing Image...</Text>
+          </View>
+        )}
       </View>
     );
   }
@@ -197,5 +210,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    marginTop: 10,
+    fontSize: 16,
   },
 });
