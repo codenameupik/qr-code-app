@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { useState, useRef } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Modal } from 'react-native';
+import { useState, useRef, useEffect } from 'react';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Modal, ScrollView, FlatList } from 'react-native';
 import jsQR from 'jsqr';
 import { Buffer } from 'buffer';
 import jpeg from 'jpeg-js';
@@ -9,20 +9,72 @@ import { PNG } from 'pngjs/browser';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-  const [view, setView] = useState('menu'); // 'menu', 'camera'
+  const [view, setView] = useState('menu'); // 'menu', 'camera', 'history'
   const [loading, setLoading] = useState(false);
   const [resultModalVisible, setResultModalVisible] = useState(false);
   const [scannedResult, setScannedResult] = useState({ type: '', data: '' });
+  const [history, setHistory] = useState([]);
   const isCancelled = useRef(false);
+
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  const loadHistory = async () => {
+    try {
+      const storedHistory = await AsyncStorage.getItem('qr_history');
+      if (storedHistory) {
+        setHistory(JSON.parse(storedHistory));
+      }
+    } catch (error) {
+      console.error("Failed to load history", error);
+    }
+  };
+
+  const addToHistory = async (type, data) => {
+    const newItem = {
+      id: Date.now().toString(),
+      type,
+      data,
+      date: new Date().toLocaleString(),
+    };
+    const newHistory = [newItem, ...history];
+    setHistory(newHistory);
+    try {
+      await AsyncStorage.setItem('qr_history', JSON.stringify(newHistory));
+    } catch (error) {
+      console.error("Failed to save history", error);
+    }
+  };
+
+  const clearHistory = async () => {
+    Alert.alert(
+      "Clear History",
+      "Are you sure you want to delete all scan history?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setHistory([]);
+            await AsyncStorage.removeItem('qr_history');
+          }
+        }
+      ]
+    );
+  };
 
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(true);
     setScannedResult({ type, data });
     setResultModalVisible(true);
+    addToHistory(type, data);
   };
 
   const handleCancel = () => {
@@ -58,21 +110,17 @@ export default function App() {
   };
 
   const scanFromImage = async () => {
-    console.log("scanFromImage called");
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    console.log("Permission status:", status);
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to make this work!');
       return;
     }
 
-    console.log("Launching image library...");
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images, // Reverting to deprecated but working option
       allowsEditing: false,
       quality: 1,
     });
-    console.log("Image library result:", result);
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setLoading(true);
@@ -128,6 +176,7 @@ export default function App() {
             if (code) {
               setScannedResult({ type: 'Image', data: code.data });
               setResultModalVisible(true);
+              addToHistory('Image', code.data);
             } else {
               Alert.alert("No QR Code Found", "Could not detect a QR code in this image.");
             }
@@ -150,6 +199,22 @@ export default function App() {
     }
   };
 
+  const renderHistoryItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.historyItem}
+      onPress={() => {
+        setScannedResult({ type: item.type, data: item.data });
+        setResultModalVisible(true);
+      }}
+    >
+      <View>
+        <Text style={styles.historyData} numberOfLines={1}>{item.data}</Text>
+        <Text style={styles.historyDate}>{item.date} • {item.type}</Text>
+      </View>
+      <Text style={styles.historyArrow}>›</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <View style={{ flex: 1 }}>
       {view === 'menu' && (
@@ -160,6 +225,9 @@ export default function App() {
           </TouchableOpacity>
           <TouchableOpacity style={styles.menuButton} onPress={scanFromImage}>
             <Text style={styles.menuButtonText}>Scan from Gallery</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuButton, styles.historyButton]} onPress={() => setView('history')}>
+            <Text style={styles.menuButtonText}>Scan History</Text>
           </TouchableOpacity>
           {loading && (
             <View style={styles.loadingOverlay}>
@@ -197,6 +265,37 @@ export default function App() {
               </View>
             </CameraView>
           )}
+        </View>
+      )}
+
+      {view === 'history' && (
+        <View style={styles.container}>
+          <View style={styles.historyHeader}>
+            <Text style={styles.historyTitle}>Scan History</Text>
+            {history.length > 0 && (
+              <TouchableOpacity onPress={clearHistory}>
+                <Text style={styles.clearButtonText}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {history.length === 0 ? (
+            <View style={styles.emptyHistory}>
+              <Text style={styles.emptyHistoryText}>No scan history yet.</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={history}
+              renderItem={renderHistoryItem}
+              keyExtractor={item => item.id}
+              style={styles.historyList}
+              contentContainerStyle={styles.historyListContent}
+            />
+          )}
+
+          <TouchableOpacity style={styles.backButtonFixed} onPress={() => setView('menu')}>
+            <Text style={styles.menuButtonText}>Back to Menu</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -253,6 +352,9 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     width: '80%',
     alignItems: 'center',
+  },
+  historyButton: {
+    backgroundColor: '#673AB7',
   },
   menuButtonText: {
     color: 'white',
@@ -378,5 +480,78 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  historyHeader: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  historyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  clearButtonText: {
+    color: '#ff4444',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  historyList: {
+    width: '100%',
+    flex: 1,
+  },
+  historyListContent: {
+    padding: 10,
+  },
+  historyItem: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  historyData: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    maxWidth: 250,
+  },
+  historyDate: {
+    fontSize: 12,
+    color: '#888',
+  },
+  historyArrow: {
+    fontSize: 20,
+    color: '#ccc',
+  },
+  emptyHistory: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyHistoryText: {
+    fontSize: 18,
+    color: '#888',
+  },
+  backButtonFixed: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    borderRadius: 10,
+    margin: 20,
+    marginBottom: 50, // Increased to avoid Android navigation bar overlap
+    width: '90%',
+    alignItems: 'center',
   },
 });
