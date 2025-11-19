@@ -1,25 +1,28 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useState, useRef } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Modal } from 'react-native';
 import jsQR from 'jsqr';
 import { Buffer } from 'buffer';
 import jpeg from 'jpeg-js';
 import { PNG } from 'pngjs/browser';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [view, setView] = useState('menu'); // 'menu', 'camera'
   const [loading, setLoading] = useState(false);
+  const [resultModalVisible, setResultModalVisible] = useState(false);
+  const [scannedResult, setScannedResult] = useState({ type: '', data: '' });
   const isCancelled = useRef(false);
 
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(true);
-    Alert.alert("Scanned!", `Bar code with type ${type} and data ${data} has been scanned!`, [
-      { text: "OK", onPress: () => setScanned(false) }
-    ]);
+    setScannedResult({ type, data });
+    setResultModalVisible(true);
   };
 
   const handleCancel = () => {
@@ -27,18 +30,49 @@ export default function App() {
     setLoading(false);
   };
 
+  const handleCloseModal = () => {
+    setResultModalVisible(false);
+    setScanned(false);
+  };
+
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(scannedResult.data);
+    Alert.alert("Copied", "Text copied to clipboard!");
+  };
+
+  const handleOpenLink = async () => {
+    try {
+      const supported = await Linking.canOpenURL(scannedResult.data);
+      if (supported) {
+        await Linking.openURL(scannedResult.data);
+      } else {
+        Alert.alert("Error", "Cannot open this URL: " + scannedResult.data);
+      }
+    } catch (err) {
+      Alert.alert("Error", "An error occurred trying to open the link.");
+    }
+  };
+
+  const isUrl = (text) => {
+    return text && (text.startsWith('http://') || text.startsWith('https://'));
+  };
+
   const scanFromImage = async () => {
+    console.log("scanFromImage called");
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log("Permission status:", status);
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Sorry, we need camera roll permissions to make this work!');
       return;
     }
 
+    console.log("Launching image library...");
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images, // Reverting to deprecated but working option
       allowsEditing: false,
       quality: 1,
     });
+    console.log("Image library result:", result);
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setLoading(true);
@@ -92,7 +126,8 @@ export default function App() {
             if (isCancelled.current) return;
 
             if (code) {
-              Alert.alert("Scanned from Image!", `Data: ${code.data}`);
+              setScannedResult({ type: 'Image', data: code.data });
+              setResultModalVisible(true);
             } else {
               Alert.alert("No QR Code Found", "Could not detect a QR code in this image.");
             }
@@ -115,63 +150,88 @@ export default function App() {
     }
   };
 
-  if (view === 'menu') {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>QR Scanner App</Text>
-        <TouchableOpacity style={styles.menuButton} onPress={() => setView('camera')}>
-          <Text style={styles.menuButtonText}>Scan with Camera</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuButton} onPress={scanFromImage}>
-          <Text style={styles.menuButtonText}>Scan from Gallery</Text>
-        </TouchableOpacity>
-        {loading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color="#2196F3" />
-            <Text style={styles.loadingText}>Processing Image...</Text>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  }
-
-  if (view === 'camera') {
-    if (!permission) {
-      return <View />;
-    }
-
-    if (!permission.granted) {
-      return (
+  return (
+    <View style={{ flex: 1 }}>
+      {view === 'menu' && (
         <View style={styles.container}>
-          <Text style={styles.message}>We need your permission to show the camera</Text>
-          <Button onPress={requestPermission} title="grant permission" />
-          <Button onPress={() => setView('menu')} title="Back to Menu" />
+          <Text style={styles.title}>QR Scanner App</Text>
+          <TouchableOpacity style={styles.menuButton} onPress={() => setView('camera')}>
+            <Text style={styles.menuButtonText}>Scan with Camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.menuButton} onPress={scanFromImage}>
+            <Text style={styles.menuButtonText}>Scan from Gallery</Text>
+          </TouchableOpacity>
+          {loading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#2196F3" />
+              <Text style={styles.loadingText}>Processing Image...</Text>
+              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-      );
-    }
+      )}
 
-    return (
-      <View style={styles.container}>
-        <CameraView
-          style={styles.camera}
-          facing="back"
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          barcodeScannerSettings={{
-            barcodeTypes: ["qr"],
-          }}
-        >
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.backButton} onPress={() => setView('menu')}>
-              <Text style={styles.text}>Back to Menu</Text>
+      {view === 'camera' && (
+        <View style={styles.container}>
+          {(!permission || !permission.granted) ? (
+            <View style={styles.container}>
+              <Text style={styles.message}>We need your permission to show the camera</Text>
+              <Button onPress={requestPermission} title="grant permission" />
+              <Button onPress={() => setView('menu')} title="Back to Menu" />
+            </View>
+          ) : (
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+              barcodeScannerSettings={{
+                barcodeTypes: ["qr"],
+              }}
+            >
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity style={styles.backButton} onPress={() => setView('menu')}>
+                  <Text style={styles.text}>Back to Menu</Text>
+                </TouchableOpacity>
+              </View>
+            </CameraView>
+          )}
+        </View>
+      )}
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={resultModalVisible}
+        onRequestClose={handleCloseModal}
+      >
+        <View style={styles.modalCenteredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>Scanned!</Text>
+            <Text style={styles.modalText}>Type: {scannedResult.type}</Text>
+            <Text style={styles.modalData}>{scannedResult.data}</Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={[styles.button, styles.buttonCopy]} onPress={handleCopy}>
+                <Text style={styles.textStyle}>Copy</Text>
+              </TouchableOpacity>
+
+              {isUrl(scannedResult.data) && (
+                <TouchableOpacity style={[styles.button, styles.buttonLink]} onPress={handleOpenLink}>
+                  <Text style={styles.textStyle}>Open Link</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <TouchableOpacity style={[styles.button, styles.buttonClose]} onPress={handleCloseModal}>
+              <Text style={styles.textStyle}>Close</Text>
             </TouchableOpacity>
           </View>
-        </CameraView>
-      </View>
-    );
-  }
+        </View>
+      </Modal>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -251,5 +311,72 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  modalCenteredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  modalText: {
+    marginBottom: 10,
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#666',
+  },
+  modalData: {
+    marginBottom: 20,
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    marginBottom: 15,
+    gap: 10,
+  },
+  button: {
+    borderRadius: 10,
+    padding: 10,
+    elevation: 2,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  buttonCopy: {
+    backgroundColor: '#2196F3',
+  },
+  buttonLink: {
+    backgroundColor: '#4CAF50',
+  },
+  buttonClose: {
+    backgroundColor: '#f44336',
+    marginTop: 10,
+    width: '100%',
+  },
+  textStyle: {
+    color: 'white',
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
