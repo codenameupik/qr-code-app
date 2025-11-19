@@ -6,8 +6,11 @@ A simple and efficient QR code scanner application built with Expo React Native.
 
 -   **Camera Scanning**: Real-time QR code scanning using the device's back camera.
 -   **Image Scanning**: Scan QR codes from images stored in your gallery.
+-   **Scan History**: View a history of your scanned QR codes and clear them when needed.
+-   **Interactive Results**: Copy scanned text to clipboard or open URLs directly from the app.
 -   **Pure JavaScript Decoding**: Uses `jsQR` for reliable image decoding without requiring native modules incompatible with Expo Go.
--   **User-Friendly Interface**: Simple menu navigation and clear feedback with loading indicators.
+-   **Optimized Performance**: Automatic image resizing and timeout handling for fast and responsive scanning.
+-   **User-Friendly Interface**: Simple menu navigation, clear feedback with loading indicators, and a clean result modal.
 
 ## Getting Started
 
