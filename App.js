@@ -1,23 +1,30 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator } from 'react-native';
 import jsQR from 'jsqr';
 import { Buffer } from 'buffer';
 import jpeg from 'jpeg-js';
 import { PNG } from 'pngjs/browser';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [view, setView] = useState('menu'); // 'menu', 'camera'
   const [loading, setLoading] = useState(false);
+  const isCancelled = useRef(false);
 
   const handleBarCodeScanned = ({ type, data }) => {
     setScanned(true);
     Alert.alert("Scanned!", `Bar code with type ${type} and data ${data} has been scanned!`, [
       { text: "OK", onPress: () => setScanned(false) }
     ]);
+  };
+
+  const handleCancel = () => {
+    isCancelled.current = true;
+    setLoading(false);
   };
 
   const scanFromImage = async () => {
@@ -31,58 +38,59 @@ export default function App() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 1,
-      base64: true,
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setLoading(true);
+      isCancelled.current = false;
       const asset = result.assets[0];
-      const base64 = asset.base64;
 
-      if (!base64) {
-        Alert.alert("Error", "Could not get image data.");
-        setLoading(false);
-        return;
-      }
+      // Timeout Logic
+      const timeoutId = setTimeout(() => {
+        if (!isCancelled.current) {
+          isCancelled.current = true;
+          setLoading(false);
+          Alert.alert("Timeout", "Image processing took too long. Please try a smaller image or one with a clearer QR code.");
+        }
+      }, 10000); // 10 seconds
 
       // Use setTimeout to allow the UI to update (show loading spinner) before heavy processing
       setTimeout(async () => {
+        if (isCancelled.current) return;
         try {
+          // Resize image to optimize performance
+          const manipulatedResult = await ImageManipulator.manipulateAsync(
+            asset.uri,
+            [{ resize: { width: 500 } }], // Resize to 500px width, maintain aspect ratio
+            { base64: true, format: ImageManipulator.SaveFormat.JPEG } // Force JPEG for consistent decoding
+          );
+
+          if (isCancelled.current) return;
+
+          const base64 = manipulatedResult.base64;
+
+          if (!base64) {
+            Alert.alert("Error", "Could not get image data.");
+            return;
+          }
+
           const buffer = Buffer.from(base64, 'base64');
+          if (isCancelled.current) return;
+
           let width, height, data;
 
-          // Simple heuristic to detect PNG vs JPEG based on file extension or magic bytes could be added
-          // For now, let's try to decode as JPEG first, then PNG if that fails, or check uri
-          const isPng = asset.uri.toLowerCase().endsWith('.png');
+          // Since we forced JPEG in manipulation, we can just use jpeg-js
+          const rawImageData = jpeg.decode(buffer, { useTArray: true });
+          width = rawImageData.width;
+          height = rawImageData.height;
+          data = new Uint8ClampedArray(rawImageData.data);
 
-          if (isPng) {
-            try {
-              const png = new PNG();
-              await new Promise((resolve, reject) => {
-                png.parse(buffer, (err, img_data) => {
-                  if (err) reject(err);
-                  else {
-                    width = img_data.width;
-                    height = img_data.height;
-                    data = new Uint8ClampedArray(img_data.data);
-                    resolve();
-                  }
-                });
-              });
-            } catch (e) {
-              console.log("PNG decode failed, trying JPEG", e);
-              // Fallback or error
-            }
-          } else {
-            // Default to JPEG
-            const rawImageData = jpeg.decode(buffer, { useTArray: true });
-            width = rawImageData.width;
-            height = rawImageData.height;
-            data = new Uint8ClampedArray(rawImageData.data);
-          }
+          if (isCancelled.current) return;
 
           if (data) {
             const code = jsQR(data, width, height);
+            if (isCancelled.current) return;
+
             if (code) {
               Alert.alert("Scanned from Image!", `Data: ${code.data}`);
             } else {
@@ -93,10 +101,15 @@ export default function App() {
           }
 
         } catch (error) {
-          console.error(error);
-          Alert.alert("Error", "Failed to scan image. " + error.message);
+          if (!isCancelled.current) {
+            console.error(error);
+            Alert.alert("Error", "Failed to scan image. " + error.message);
+          }
         } finally {
-          setLoading(false);
+          clearTimeout(timeoutId);
+          if (!isCancelled.current) {
+            setLoading(false);
+          }
         }
       }, 100);
     }
@@ -116,6 +129,9 @@ export default function App() {
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#2196F3" />
             <Text style={styles.loadingText}>Processing Image...</Text>
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -225,5 +241,15 @@ const styles = StyleSheet.create({
     color: 'white',
     marginTop: 10,
     fontSize: 16,
+    marginBottom: 20,
+  },
+  cancelButton: {
+    backgroundColor: '#ff4444',
+    padding: 10,
+    borderRadius: 5,
+  },
+  cancelButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
