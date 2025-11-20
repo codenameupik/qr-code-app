@@ -11,6 +11,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -22,6 +24,7 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [qrText, setQrText] = useState('');
   const [generatedQR, setGeneratedQR] = useState('');
+  const qrRef = useRef(null);
   const isCancelled = useRef(false);
 
   useEffect(() => {
@@ -111,6 +114,44 @@ export default function App() {
   const isUrl = (text) => {
     return text && (text.startsWith('http://') || text.startsWith('https://'));
   };
+
+  const shareQRCode = async () => {
+    try {
+      if (!qrRef.current) {
+        Alert.alert("Error", "QR Code not found");
+        return;
+      }
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Error', 'Sharing is not available on this device');
+        return;
+      }
+
+      // Convert QR code to data URL
+      qrRef.current.toDataURL(async (dataURL) => {
+        try {
+          const filename = FileSystem.cacheDirectory + `qrcode_${Date.now()}.png`;
+          await FileSystem.writeAsStringAsync(filename, dataURL, {
+            encoding: 'base64',
+          });
+          
+          await Sharing.shareAsync(filename, {
+            mimeType: 'image/png',
+            dialogTitle: 'Share QR Code',
+            UTI: 'public.png'
+          });
+        } catch (error) {
+          console.error(error);
+          Alert.alert('Error', 'Failed to share QR code: ' + error.message);
+        }
+      });
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to share QR code: ' + error.message);
+    }
+  };
+
 
   const scanFromImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -339,9 +380,15 @@ export default function App() {
                     size={200}
                     backgroundColor="white"
                     color="black"
+                    getRef={(ref) => (qrRef.current = ref)}
                   />
                 </View>
                 <Text style={styles.qrText} numberOfLines={2}>{generatedQR}</Text>
+                
+                <TouchableOpacity style={styles.shareQRButton} onPress={shareQRCode}>
+                  <Text style={styles.qrActionButtonText}>Share QR Code</Text>
+                </TouchableOpacity>
+                <Text style={styles.shareHint}>Tap to share or save to your device</Text>
               </View>
             )}
           </View>
@@ -700,5 +747,28 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     maxWidth: 250,
+    marginBottom: 20,
+  },
+  shareQRButton: {
+    backgroundColor: '#10B981',
+    padding: 16,
+    borderRadius: 0,
+    width: '100%',
+    maxWidth: 300,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  shareHint: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  qrActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 });
