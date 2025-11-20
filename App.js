@@ -328,7 +328,8 @@ export default function App() {
             source={require('./assets/icons/ios/AppIcon-60@3x~car.png')} 
             style={styles.appIcon} 
           />
-          <Text style={styles.title}>QR Scanner App</Text>
+          <Text style={styles.title}>Snappy QR</Text>
+          <Text style={styles.tagline}>Fast QR Scanner & Generator</Text>
           <TouchableOpacity style={styles.menuButton} onPress={() => setView('camera')}>
             <Text style={styles.menuButtonText}>Scan with Camera</Text>
           </TouchableOpacity>
@@ -542,6 +543,14 @@ const getStyles = (colors) => StyleSheet.create({
     marginBottom: 48,
     color: colors.text,
     letterSpacing: -0.5,
+  },
+  tagline: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 48,
+    marginTop: -40,
+    color: colors.textSecondary,
+    letterSpacing: 0.5,
   },
   appIcon: {
     width: 120,

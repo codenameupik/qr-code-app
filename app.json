@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "qr-code-app",
-    "slug": "qr-code-app",
+    "name": "Snappy QR",
+    "slug": "snappy-qr",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icons/ios/AppIcon~ios-marketing.png",
