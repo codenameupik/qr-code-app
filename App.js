@@ -13,6 +13,40 @@ import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { StatusBar } from 'expo-status-bar';
+
+const THEMES = {
+  light: {
+    background: '#FAFAFA',
+    text: '#1A1A1A',
+    textSecondary: '#6B7280',
+    textLight: '#FFFFFF',
+    primary: '#6366F1',
+    secondary: '#8B5CF6',
+    success: '#10B981',
+    danger: '#EF4444',
+    card: '#FFFFFF',
+    border: '#E5E7EB',
+    inputBg: '#FFFFFF',
+    modalBg: '#FFFFFF',
+    overlay: 'rgba(26,26,26,0.85)',
+  },
+  dark: {
+    background: '#111827',
+    text: '#F9FAFB',
+    textSecondary: '#9CA3AF',
+    textLight: '#FFFFFF',
+    primary: '#818CF8',
+    secondary: '#A78BFA',
+    success: '#34D399',
+    danger: '#F87171',
+    card: '#1F2937',
+    border: '#374151',
+    inputBg: '#374151',
+    modalBg: '#1F2937',
+    overlay: 'rgba(0,0,0,0.9)',
+  },
+};
 
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -24,12 +58,38 @@ export default function App() {
   const [history, setHistory] = useState([]);
   const [qrText, setQrText] = useState('');
   const [generatedQR, setGeneratedQR] = useState('');
+  const [theme, setTheme] = useState('light');
   const qrRef = useRef(null);
   const isCancelled = useRef(false);
 
+  const colors = THEMES[theme];
+  const styles = getStyles(colors);
+
   useEffect(() => {
     loadHistory();
+    loadTheme();
   }, []);
+
+  const loadTheme = async () => {
+    try {
+      const storedTheme = await AsyncStorage.getItem('app_theme');
+      if (storedTheme) {
+        setTheme(storedTheme);
+      }
+    } catch (error) {
+      console.error("Failed to load theme", error);
+    }
+  };
+
+  const toggleTheme = async () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    try {
+      await AsyncStorage.setItem('app_theme', newTheme);
+    } catch (error) {
+      console.error("Failed to save theme", error);
+    }
+  };
 
   const loadHistory = async () => {
     try {
@@ -260,7 +320,8 @@ export default function App() {
   );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       {view === 'menu' && (
         <View style={styles.container}>
           <Text style={styles.title}>QR Scanner App</Text>
@@ -275,6 +336,9 @@ export default function App() {
           </TouchableOpacity>
           <TouchableOpacity style={[styles.menuButton, styles.createButton]} onPress={() => setView('create')}>
             <Text style={styles.menuButtonText}>Create QR Code</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuButton, styles.settingsButton]} onPress={() => setView('settings')}>
+            <Text style={styles.menuButtonText}>Settings</Text>
           </TouchableOpacity>
           {loading && (
             <View style={styles.loadingOverlay}>
@@ -348,16 +412,16 @@ export default function App() {
 
       {view === 'create' && (
         <View style={styles.container}>
-          <View style={styles.createHeader}>
-            <Text style={styles.createTitle}>Create QR Code</Text>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Create QR Code</Text>
           </View>
           
-          <View style={styles.createContent}>
+          <View style={styles.content}>
             <Text style={styles.inputLabel}>Enter Text or URL</Text>
             <TextInput
               style={styles.textInput}
               placeholder="Type something..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colors.textSecondary}
               value={qrText}
               onChangeText={setQrText}
               multiline
@@ -403,6 +467,30 @@ export default function App() {
         </View>
       )}
 
+      {view === 'settings' && (
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Settings</Text>
+          </View>
+          
+          <View style={styles.content}>
+            <TouchableOpacity style={styles.settingItem} onPress={toggleTheme}>
+              <View>
+                <Text style={styles.settingLabel}>App Theme</Text>
+                <Text style={styles.settingValue}>{theme === 'light' ? 'Light Mode' : 'Dark Mode'}</Text>
+              </View>
+              <View style={[styles.themeToggle, theme === 'dark' && styles.themeToggleActive]}>
+                <View style={[styles.themeToggleKnob, theme === 'dark' && styles.themeToggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.backButtonFixed} onPress={() => setView('menu')}>
+            <Text style={styles.menuButtonText}>Back to Menu</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <Modal
         animationType="slide"
         transparent={true}
@@ -437,22 +525,22 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FAFAFA',
+    backgroundColor: colors.background,
   },
   title: {
     fontSize: 32,
     fontWeight: '700',
     marginBottom: 48,
-    color: '#1A1A1A',
+    color: colors.text,
     letterSpacing: -0.5,
   },
   menuButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: colors.primary,
     padding: 18,
     borderRadius: 0,
     marginVertical: 8,
@@ -461,10 +549,16 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   historyButton: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: colors.secondary,
+  },
+  createButton: {
+    backgroundColor: colors.success,
+  },
+  settingsButton: {
+    backgroundColor: '#6B7280',
   },
   menuButtonText: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -473,7 +567,7 @@ const styles = StyleSheet.create({
   message: {
     textAlign: 'center',
     paddingBottom: 10,
-    color: '#4A5568',
+    color: colors.textSecondary,
   },
   camera: {
     flex: 1,
@@ -490,14 +584,14 @@ const styles = StyleSheet.create({
   backButton: {
     alignSelf: 'flex-end',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: colors.text,
     padding: 16,
     borderRadius: 0,
   },
   text: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.textLight,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -507,25 +601,25 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(26,26,26,0.85)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     marginTop: 16,
     fontSize: 16,
     marginBottom: 24,
     fontWeight: '500',
   },
   cancelButton: {
-    backgroundColor: '#EF4444',
+    backgroundColor: colors.danger,
     padding: 12,
     borderRadius: 0,
     paddingHorizontal: 32,
   },
   cancelButtonText: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
@@ -534,11 +628,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(26,26,26,0.6)',
+    backgroundColor: colors.overlay,
   },
   modalView: {
     margin: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.modalBg,
     borderRadius: 0,
     padding: 32,
     alignItems: 'center',
@@ -549,13 +643,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     marginBottom: 20,
-    color: '#1A1A1A',
+    color: colors.text,
   },
   modalText: {
     marginBottom: 12,
     textAlign: 'center',
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     fontWeight: '600',
@@ -565,7 +659,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '500',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   modalButtons: {
     flexDirection: 'row',
@@ -581,18 +675,18 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   buttonCopy: {
-    backgroundColor: '#6366F1',
+    backgroundColor: colors.primary,
   },
   buttonLink: {
-    backgroundColor: '#10B981',
+    backgroundColor: colors.success,
   },
   buttonClose: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: colors.text,
     marginTop: 8,
     width: '100%',
   },
   textStyle: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     fontWeight: '600',
     textAlign: 'center',
     letterSpacing: 0.5,
@@ -605,17 +699,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     paddingTop: 60,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     borderBottomWidth: 2,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
   },
   historyTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
   clearButtonText: {
-    color: '#EF4444',
+    color: colors.danger,
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -629,7 +723,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   historyItem: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 0,
     marginBottom: 12,
@@ -637,23 +731,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderLeftWidth: 4,
-    borderLeftColor: '#6366F1',
+    borderLeftColor: colors.primary,
   },
   historyData: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 6,
     maxWidth: 250,
-    color: '#1A1A1A',
+    color: colors.text,
   },
   historyDate: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   historyArrow: {
     fontSize: 24,
-    color: '#D1D5DB',
+    color: colors.border,
   },
   emptyHistory: {
     flex: 1,
@@ -662,11 +756,11 @@ const styles = StyleSheet.create({
   },
   emptyHistoryText: {
     fontSize: 16,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   backButtonFixed: {
-    backgroundColor: '#6366F1',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 0,
     margin: 20,
@@ -674,24 +768,21 @@ const styles = StyleSheet.create({
     width: '90%',
     alignItems: 'center',
   },
-  createButton: {
-    backgroundColor: '#10B981',
-  },
-  createHeader: {
+  header: {
     width: '100%',
     padding: 24,
     paddingTop: 60,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.background,
     borderBottomWidth: 2,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: colors.border,
     alignItems: 'center',
   },
-  createTitle: {
+  headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: colors.text,
   },
-  createContent: {
+  content: {
     flex: 1,
     width: '100%',
     padding: 24,
@@ -700,7 +791,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 12,
@@ -708,19 +799,19 @@ const styles = StyleSheet.create({
   },
   textInput: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.inputBg,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderRadius: 0,
     padding: 16,
     fontSize: 16,
-    color: '#1A1A1A',
+    color: colors.text,
     textAlignVertical: 'top',
     minHeight: 100,
     marginBottom: 20,
   },
   generateButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: colors.primary,
     padding: 16,
     borderRadius: 0,
     width: '100%',
@@ -728,7 +819,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   generateButtonDisabled: {
-    backgroundColor: '#D1D5DB',
+    backgroundColor: colors.border,
   },
   qrContainer: {
     alignItems: 'center',
@@ -738,19 +829,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     padding: 24,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
     borderRadius: 0,
     marginBottom: 16,
   },
   qrText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
     textAlign: 'center',
     maxWidth: 250,
     marginBottom: 20,
   },
   shareQRButton: {
-    backgroundColor: '#10B981',
+    backgroundColor: colors.success,
     padding: 16,
     borderRadius: 0,
     width: '100%',
@@ -760,15 +851,56 @@ const styles = StyleSheet.create({
   },
   shareHint: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: colors.textSecondary,
     textAlign: 'center',
     fontWeight: '500',
   },
   qrActionButtonText: {
-    color: '#FFFFFF',
+    color: colors.textLight,
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  settingItem: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 16,
+  },
+  settingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  settingValue: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  themeToggle: {
+    width: 50,
+    height: 28,
+    backgroundColor: colors.border,
+    borderRadius: 14,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  themeToggleActive: {
+    backgroundColor: colors.primary,
+  },
+  themeToggleKnob: {
+    width: 24,
+    height: 24,
+    backgroundColor: 'white',
+    borderRadius: 12,
+  },
+  themeToggleKnobActive: {
+    alignSelf: 'flex-end',
   },
 });
