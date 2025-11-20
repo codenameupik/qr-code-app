@@ -19,7 +19,16 @@
         "foregroundImage": "./assets/icons/web/icon-512-maskable.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.qrcodeapp"
+      "package": "com.anonymous.qrcodeapp",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "plugins": [
       [
@@ -33,6 +42,11 @@
     ],
     "web": {
       "favicon": "./assets/icons/web/favicon.ico"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "fe474d12-8f35-4dca-801d-9e7fc8bae039"
+      }
     }
   }
 }
