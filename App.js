@@ -1,7 +1,8 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Modal, ScrollView, FlatList } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Modal, ScrollView, FlatList, TextInput } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import jsQR from 'jsqr';
 import { Buffer } from 'buffer';
 import jpeg from 'jpeg-js';
@@ -14,11 +15,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-  const [view, setView] = useState('menu'); // 'menu', 'camera', 'history'
+  const [view, setView] = useState('menu'); // 'menu', 'camera', 'history', 'create'
   const [loading, setLoading] = useState(false);
   const [resultModalVisible, setResultModalVisible] = useState(false);
   const [scannedResult, setScannedResult] = useState({ type: '', data: '' });
   const [history, setHistory] = useState([]);
+  const [qrText, setQrText] = useState('');
+  const [generatedQR, setGeneratedQR] = useState('');
   const isCancelled = useRef(false);
 
   useEffect(() => {
@@ -229,6 +232,9 @@ export default function App() {
           <TouchableOpacity style={[styles.menuButton, styles.historyButton]} onPress={() => setView('history')}>
             <Text style={styles.menuButtonText}>Scan History</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.menuButton, styles.createButton]} onPress={() => setView('create')}>
+            <Text style={styles.menuButtonText}>Create QR Code</Text>
+          </TouchableOpacity>
           {loading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#2196F3" />
@@ -299,6 +305,57 @@ export default function App() {
         </View>
       )}
 
+      {view === 'create' && (
+        <View style={styles.container}>
+          <View style={styles.createHeader}>
+            <Text style={styles.createTitle}>Create QR Code</Text>
+          </View>
+          
+          <View style={styles.createContent}>
+            <Text style={styles.inputLabel}>Enter Text or URL</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Type something..."
+              placeholderTextColor="#9CA3AF"
+              value={qrText}
+              onChangeText={setQrText}
+              multiline
+              numberOfLines={4}
+            />
+            
+            <TouchableOpacity 
+              style={[styles.generateButton, !qrText && styles.generateButtonDisabled]} 
+              onPress={() => setGeneratedQR(qrText)}
+              disabled={!qrText}
+            >
+              <Text style={styles.menuButtonText}>Generate QR Code</Text>
+            </TouchableOpacity>
+
+            {generatedQR && (
+              <View style={styles.qrContainer}>
+                <View style={styles.qrWrapper}>
+                  <QRCode
+                    value={generatedQR}
+                    size={200}
+                    backgroundColor="white"
+                    color="black"
+                  />
+                </View>
+                <Text style={styles.qrText} numberOfLines={2}>{generatedQR}</Text>
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.backButtonFixed} onPress={() => {
+            setView('menu');
+            setQrText('');
+            setGeneratedQR('');
+          }}>
+            <Text style={styles.menuButtonText}>Back to Menu</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <Modal
         animationType="slide"
         transparent={true}
@@ -338,32 +395,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FAFAFA',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 40,
+    fontSize: 32,
+    fontWeight: '700',
+    marginBottom: 48,
+    color: '#1A1A1A',
+    letterSpacing: -0.5,
   },
   menuButton: {
-    backgroundColor: '#2196F3',
-    padding: 20,
-    borderRadius: 10,
-    marginVertical: 10,
-    width: '80%',
+    backgroundColor: '#6366F1',
+    padding: 18,
+    borderRadius: 0,
+    marginVertical: 8,
+    width: '85%',
     alignItems: 'center',
+    borderWidth: 0,
   },
   historyButton: {
-    backgroundColor: '#673AB7',
+    backgroundColor: '#8B5CF6',
   },
   menuButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   message: {
     textAlign: 'center',
     paddingBottom: 10,
+    color: '#4A5568',
   },
   camera: {
     flex: 1,
@@ -380,14 +443,16 @@ const styles = StyleSheet.create({
   backButton: {
     alignSelf: 'flex-end',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: '#1A1A1A',
+    padding: 16,
+    borderRadius: 0,
   },
   text: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   loadingOverlay: {
     position: 'absolute',
@@ -395,146 +460,153 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(26,26,26,0.85)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    color: 'white',
-    marginTop: 10,
+    color: '#FFFFFF',
+    marginTop: 16,
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 24,
+    fontWeight: '500',
   },
   cancelButton: {
-    backgroundColor: '#ff4444',
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    padding: 12,
+    borderRadius: 0,
+    paddingHorizontal: 32,
   },
   cancelButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   modalCenteredView: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(26,26,26,0.6)',
   },
   modalView: {
     margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 35,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 0,
+    padding: 32,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    width: '80%',
+    width: '85%',
+    borderWidth: 0,
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 15,
+    fontWeight: '700',
+    marginBottom: 20,
+    color: '#1A1A1A',
   },
   modalText: {
-    marginBottom: 10,
+    marginBottom: 12,
     textAlign: 'center',
-    fontSize: 16,
-    color: '#666',
+    fontSize: 14,
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: '600',
   },
   modalData: {
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1A1A1A',
   },
   modalButtons: {
     flexDirection: 'row',
-    marginBottom: 15,
-    gap: 10,
+    marginBottom: 16,
+    gap: 12,
   },
   button: {
-    borderRadius: 10,
-    padding: 10,
-    elevation: 2,
-    minWidth: 80,
+    borderRadius: 0,
+    padding: 12,
+    paddingHorizontal: 24,
+    minWidth: 90,
     alignItems: 'center',
+    borderWidth: 0,
   },
   buttonCopy: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#6366F1',
   },
   buttonLink: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#10B981',
   },
   buttonClose: {
-    backgroundColor: '#f44336',
-    marginTop: 10,
+    backgroundColor: '#1A1A1A',
+    marginTop: 8,
     width: '100%',
   },
   textStyle: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontWeight: '600',
     textAlign: 'center',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   historyHeader: {
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
     paddingTop: 60,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 2,
+    borderBottomColor: '#E5E7EB',
   },
   historyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1A1A1A',
   },
   clearButtonText: {
-    color: '#ff4444',
-    fontSize: 16,
-    fontWeight: 'bold',
+    color: '#EF4444',
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   historyList: {
     width: '100%',
     flex: 1,
   },
   historyListContent: {
-    padding: 10,
+    padding: 16,
   },
   historyItem: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 0,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#6366F1',
   },
   historyData: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
+    fontWeight: '600',
+    marginBottom: 6,
     maxWidth: 250,
+    color: '#1A1A1A',
   },
   historyDate: {
     fontSize: 12,
-    color: '#888',
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   historyArrow: {
-    fontSize: 20,
-    color: '#ccc',
+    fontSize: 24,
+    color: '#D1D5DB',
   },
   emptyHistory: {
     flex: 1,
@@ -542,16 +614,91 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyHistoryText: {
-    fontSize: 18,
-    color: '#888',
+    fontSize: 16,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   backButtonFixed: {
-    backgroundColor: '#2196F3',
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: '#6366F1',
+    padding: 16,
+    borderRadius: 0,
     margin: 20,
-    marginBottom: 50, // Increased to avoid Android navigation bar overlap
+    marginBottom: 50,
     width: '90%',
     alignItems: 'center',
+  },
+  createButton: {
+    backgroundColor: '#10B981',
+  },
+  createHeader: {
+    width: '100%',
+    padding: 24,
+    paddingTop: 60,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 2,
+    borderBottomColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  createTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  createContent: {
+    flex: 1,
+    width: '100%',
+    padding: 24,
+    alignItems: 'center',
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  textInput: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 0,
+    padding: 16,
+    fontSize: 16,
+    color: '#1A1A1A',
+    textAlignVertical: 'top',
+    minHeight: 100,
+    marginBottom: 20,
+  },
+  generateButton: {
+    backgroundColor: '#6366F1',
+    padding: 16,
+    borderRadius: 0,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  generateButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  qrContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  qrWrapper: {
+    backgroundColor: '#FFFFFF',
+    padding: 24,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 0,
+    marginBottom: 16,
+  },
+  qrText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    maxWidth: 250,
   },
 });
