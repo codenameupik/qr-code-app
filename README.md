@@ -1,16 +1,33 @@
 # Snappy QR
 
-A simple and efficient QR code scanner application built with Expo React Native. This app allows users to scan QR codes directly using the camera or by selecting an image from the device's gallery.
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Expo](https://img.shields.io/badge/expo-54.0.25-black)
+![React Native](https://img.shields.io/badge/react--native-0.81.5-cyan)
+
+**Fast QR Scanner & Generator**
+
+Snappy QR is a simple, efficient, and privacy-focused QR code scanner and generator built with Expo and React Native. It allows users to scan QR codes instantly using the camera or from images in the gallery, and generate their own QR codes with ease.
+
+## Screenshots
+
+<!-- Add screenshots here -->
+<!--
+<div style="display: flex; flex-direction: row; gap: 10px;">
+  <img src="path/to/screenshot1.png" alt="Home Screen" width="200" />
+  <img src="path/to/screenshot2.png" alt="Scanner" width="200" />
+  <img src="path/to/screenshot3.png" alt="Generator" width="200" />
+</div>
+-->
 
 ## Features
 
-- **Camera Scanning**: Real-time QR code scanning using the device's back camera.
-- **Image Scanning**: Scan QR codes from images stored in your gallery.
-- **Scan History**: View a history of your scanned QR codes and clear them when needed.
-- **Interactive Results**: Copy scanned text to clipboard or open URLs directly from the app.
-- **Pure JavaScript Decoding**: Uses `jsQR` for reliable image decoding without requiring native modules incompatible with Expo Go.
-- **Optimized Performance**: Automatic image resizing and timeout handling for fast and responsive scanning.
-- **User-Friendly Interface**: Simple menu navigation, clear feedback with loading indicators, and a clean result modal.
+- **⚡ Fast Camera Scanning**: Real-time QR code scanning using the device's back camera.
+- **🖼️ Image Scanning**: Scan QR codes directly from images stored in your gallery.
+- **📝 QR Generator**: Create QR codes for text or URLs instantly.
+- **📜 Scan History**: Keep track of your scanned QR codes and clear history when needed.
+- **🔗 Interactive Results**: Copy scanned text to clipboard or open URLs directly.
+- **🌗 Dark Mode**: Seamlessly switch between light and dark themes.
+- **🔒 Privacy Focused**: No data leaves your device; all processing is done locally.
 
 ## Getting Started
 
@@ -23,11 +40,11 @@ A simple and efficient QR code scanner application built with Expo React Native.
 
 1.  Clone the repository:
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/yourusername/snappy-qr.git
     ```
 2.  Navigate to the project directory:
     ```bash
-    cd qr-code-app
+    cd snappy-qr
     ```
 3.  Install dependencies:
     ```bash
@@ -49,3 +66,12 @@ A simple and efficient QR code scanner application built with Expo React Native.
 - [expo-camera](https://docs.expo.dev/versions/latest/sdk/camera/)
 - [expo-image-picker](https://docs.expo.dev/versions/latest/sdk/imagepicker/)
 - [jsQR](https://github.com/cozmo/jsQR) (for image decoding)
+- [react-native-qrcode-svg](https://github.com/awesomejerry/react-native-qrcode-svg)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License.
