@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useState, useRef, useEffect } from 'react';
-import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Modal, ScrollView, FlatList, TextInput } from 'react-native';
+import { Button, StyleSheet, Text, TouchableOpacity, View, Alert, ActivityIndicator, Modal, ScrollView, FlatList, TextInput, Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import jsQR from 'jsqr';
 import { Buffer } from 'buffer';
@@ -324,6 +324,10 @@ export default function App() {
       <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       {view === 'menu' && (
         <View style={styles.container}>
+          <Image 
+            source={require('./assets/icons/ios/AppIcon-60@3x~car.png')} 
+            style={styles.appIcon} 
+          />
           <Text style={styles.title}>QR Scanner App</Text>
           <TouchableOpacity style={styles.menuButton} onPress={() => setView('camera')}>
             <Text style={styles.menuButtonText}>Scan with Camera</Text>
@@ -538,6 +542,12 @@ const getStyles = (colors) => StyleSheet.create({
     marginBottom: 48,
     color: colors.text,
     letterSpacing: -0.5,
+  },
+  appIcon: {
+    width: 120,
+    height: 120,
+    marginBottom: 24,
+    borderRadius: 24,
   },
   menuButton: {
     backgroundColor: colors.primary,
